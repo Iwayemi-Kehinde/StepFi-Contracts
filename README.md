@@ -1,202 +1,150 @@
-<div align="center">
-
-![Stellar](https://img.shields.io/badge/Stellar-7D00FF?style=for-the-badge&logo=stellar&logoColor=white)
-![Rust](https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white)
-![Soroban](https://img.shields.io/badge/Soroban-7D00FF?style=for-the-badge&logo=stellar&logoColor=white)
-
-[![Open Source](https://img.shields.io/badge/Open%20Source-Yes-green?style=flat-square)](https://opensource.org/)
-[![MIT License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](./LICENSE)
-
 # StepFi Contracts
 
-**Step into your future. Credit without banks. Progress without limits.**
+> Soroban smart contracts powering the StepFi BNPL protocol on Stellar — open-source, auditable, and built for learners.
 
-Soroban smart contracts powering the StepFi learner BNPL protocol on Stellar
+## Live on Stellar Testnet ✅
 
-[Contracts](#-contracts) • [Architecture](#-architecture) • [Quick Start](#-quick-start) • [Deployment](#-deployment) • [Contributing](#-contributing)
+All 5 contracts are deployed, initialized, and active on Stellar testnet.
 
-</div>
+| Contract | Contract ID | Explorer |
+|---|---|---|
+| Creditline | `CCWFD2J2NQS56HFNPG2S4HUR2LBA3O7NDQCB35C5JD7EBQUZ63G3LBCP` | [View ↗](https://stellar.expert/explorer/testnet/contract/CCWFD2J2NQS56HFNPG2S4HUR2LBA3O7NDQCB35C5JD7EBQUZ63G3LBCP) |
+| Reputation | `CC3BO57ZRJGA63QJBIBSOMI25Z3X2I5CYTARYRAUXUAILX6L3OWBL5SB` | [View ↗](https://stellar.expert/explorer/testnet/contract/CC3BO57ZRJGA63QJBIBSOMI25Z3X2I5CYTARYRAUXUAILX6L3OWBL5SB) |
+| Liquidity Pool | `CACKE7ML2BTOAGQTAAW5NEARHCFX4PXXKGEO6GMU6NHFBVYQFZRJS2BT` | [View ↗](https://stellar.expert/explorer/testnet/contract/CACKE7ML2BTOAGQTAAW5NEARHCFX4PXXKGEO6GMU6NHFBVYQFZRJS2BT) |
+| Vendor Registry | `CCZ6T6NYCDNI26VGTPXKKWQDR7JCIZZ24LCEG4MMYHZJAG6BPWIVAU2L` | [View ↗](https://stellar.expert/explorer/testnet/contract/CCZ6T6NYCDNI26VGTPXKKWQDR7JCIZZ24LCEG4MMYHZJAG6BPWIVAU2L) |
+| Parameters | `CCAE72SKYX55C5L56DBEFIMFVXRUIJY6JYLBREHEWRFNOW7AX5NBIJ5B` | [View ↗](https://stellar.expert/explorer/testnet/contract/CCAE72SKYX55C5L56DBEFIMFVXRUIJY6JYLBREHEWRFNOW7AX5NBIJ5B) |
 
----
-
-## 📖 About
-
-StepFi Contracts is the on-chain layer of the StepFi protocol — a collection of Soroban smart contracts written in Rust that power decentralized learner financing on the Stellar network.
-
-These contracts handle everything that must be trustless and transparent: loan creation, installment repayments, reputation scoring, liquidity pool management, and vendor verification.
-
----
-
-## 📦 Contracts
-
-| Contract | Description |
-|---|---|
-| `reputation-contract` | On-chain reputation score (0–100) per user. Drives credit limits and interest rates. |
-| `creditline-contract` | Core BNPL engine — loan creation, per-installment repayment, defaults, late fees, grace periods. |
-| `liquidity-pool-contract` | Share-based LP pool — deposits, withdrawals, loan funding, interest distribution (85/10/5 split). |
-| `vendor-registry-contract` | Admin-managed whitelist of verified learning vendors (schools, bootcamps, electronics). |
-| `parameters-contract` | Governance-tunable protocol parameters — interest BPS, grace periods, min reputation, etc. |
+Deployer: `GCOYDYSEHRCFWGXUCMPSQ3ODEY2LGMBSVKKCOFH4NRIK4DEEDSETH7BF`
+Deployed: 2026-05-11
+Full deployment details: [`contracts/deployed-testnet.json`](./contracts/deployed-testnet.json)
 
 ---
 
-## 🏗 Architecture
+## Architecture
+
+StepFi uses 5 Soroban smart contracts that work together:
 
 ```
-StepFi-Contracts/
-├── contracts/
-│   ├── reputation-contract/       # On-chain reputation scoring
-│   ├── creditline-contract/       # Loan lifecycle management
-│   ├── liquidity-pool-contract/   # LP pool and interest distribution
-│   ├── vendor-registry-contract/  # Learning vendor whitelist
-│   └── parameters-contract/       # Protocol governance parameters
-├── docs/
-│   ├── architecture/              # Contract architecture docs
-│   ├── development/               # Development standards
-│   └── resources/                 # Stellar/Soroban references
-├── scripts/
-│   └── deploy-testnet.sh          # Testnet deployment script
-├── CONTRIBUTING.md
-├── ROADMAP.md
-└── SECURITY.md
+┌─────────────────────────────────────────────────┐
+│                 StepFi Protocol                  │
+├──────────────┬──────────────┬────────────────────┤
+│  Creditline  │  Reputation  │  Liquidity Pool    │
+│  (core BNPL) │  (scoring)   │  (sponsor capital) │
+├──────────────┴──────────────┴────────────────────┤
+│      Vendor Registry   │   Parameters            │
+│      (vendor data)     │   (protocol config)     │
+└─────────────────────────────────────────────────┘
 ```
 
-### Contract Interaction Flow
+### Contract Responsibilities
 
-```
-User Wallet
-│
-▼
-creditline-contract  ──── calls ────▶  reputation-contract (validate score)
-│                                          │
-│                ◀─── score ───────────────┘
-│
-├── calls ──▶  vendor-registry-contract (validate vendor)
-│
-├── calls ──▶  liquidity-pool-contract (fund loan / receive repayment)
-│
-└── calls ──▶  parameters-contract (get protocol params)
-```
+**Creditline** — The core lending contract:
+- `create_loan()` — initiates a new BNPL loan
+- `repay_installment()` — processes individual installment payments
+- `approve_loan()` — transitions loan from Pending → Active
+- Tracks LoanType (Standard, LearnerInstallment)
+- Per-installment paid/unpaid tracking with timestamps
+- Reentrancy guard on all mutating functions
 
-### Reputation → Credit Tiers
+**Reputation** — On-chain credit scoring:
+- `get_score()` — returns borrower score (0-100)
+- `update_score()` — updates score after payment events
+- Score determines interest rate and credit limit:
+  - 0-59 (Starter): 10% APR, $1,000 limit
+  - 60-74 (Bronze): 8% APR, $2,500 limit
+  - 75-89 (Silver): 6% APR, $5,000 limit
+  - 90-100 (Gold): 4% APR, $10,000 limit
 
-| Score | Tier | Interest Rate | Credit Limit |
-|---|---|---|---|
-| 90+ | Gold | 4% | $10,000 |
-| 75–89 | Silver | 6% | $5,000 |
-| 60–74 | Bronze | 8% | $2,500 |
-| < 60 | Starter | 10% | $1,000 |
+**Liquidity Pool** — Sponsor capital management:
+- `deposit()` — sponsors add capital to the pool
+- `withdraw()` — sponsors withdraw with yield
+- `get_pool_info()` — returns pool stats
+
+**Vendor Registry** — Learning vendor management:
+- Stores verified vendor profiles
+- Tracks vendor categories (School, Bootcamp, Electronics)
+- Admin-controlled vendor approval
+
+**Parameters** — Protocol governance:
+- Base interest rates, penalty amounts
+- Minimum guarantee percent (20%)
+- Minimum reputation threshold (50)
+- Grace period and large loan thresholds
 
 ---
 
-## 🚀 Quick Start
+## Getting Started
 
 ### Prerequisites
-
-- Rust (latest stable)
-- Soroban CLI
-- Stellar CLI
-- A funded Stellar testnet account
-
-### Install Rust & Soroban
+- Rust + wasm32-unknown-unknown target
+- Stellar CLI v22+
 
 ```bash
-# Install Rust
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# Add WASM target
+# Install Rust target
 rustup target add wasm32-unknown-unknown
 
 # Install Stellar CLI
-cargo install --locked stellar-cli --features opt
+curl -L https://github.com/stellar/stellar-cli/releases/download/v22.8.1/stellar-cli-x86_64-unknown-linux-gnu.tar.gz \
+  | tar -xz -C ~/.cargo/bin/
 ```
 
-### Build All Contracts
+### Build
 
 ```bash
-# Clone the repository
-git clone https://github.com/StepFi-app/StepFi-Contracts.git
-cd StepFi-Contracts
-
 # Build all contracts
 cargo build --target wasm32-unknown-unknown --release
-```
 
-### Run Tests
-
-```bash
 # Run all tests
-cargo test
-
-# Run tests for a specific contract
-cargo test -p reputation-contract
-cargo test -p creditline-contract
-cargo test -p liquidity-pool-contract
+cargo test --manifest-path contracts/creditline-contract/Cargo.toml
 ```
 
----
+### Test Results
 
-## 🚢 Deployment
+```
+test result: ok. 93 passed; 0 failed; 4 ignored
+```
 
-### Testnet Deployment
+### Deploy to Testnet
 
 ```bash
-# Run the deployment script
+# Generate deployer keypair
+stellar keys generate stepfi-deployer --network testnet
+stellar keys fund stepfi-deployer --network testnet
+
+# Run deploy script
 chmod +x scripts/deploy-testnet.sh
 ./scripts/deploy-testnet.sh
 ```
 
-The script will output contract addresses — add them to StepFi-API `.env`:
-```
-REPUTATION_CONTRACT_ID=...
-CREDIT_LINE_CONTRACT_ID=...
-MERCHANT_REGISTRY_CONTRACT_ID=...
-LIQUIDITY_POOL_CONTRACT_ID=...
-```
+---
 
-### Initialization Order
+## Contract Security
 
-Contracts must be initialized in this exact order:
-1. `parameters-contract`
-2. `reputation-contract`
-3. `vendor-registry-contract`
-4. `liquidity-pool-contract`
-5. `creditline-contract`
-
-Each contract needs the addresses of its dependencies passed to `initialize()`.
+- All mutating functions require `require_auth()`
+- Reentrancy guard on loan operations
+- TTL extension on every persistent storage write
+- Checked arithmetic on all balance operations
+- No `unwrap()` on user-facing paths (hardening in progress)
 
 ---
 
-## 🔐 Security
+## Contributing
 
-- Reentrancy guards on all mutating functions
-- Auth-first pattern — `require_auth()` before any state change
-- Checked arithmetic — no overflow/underflow
-- Role-based access — admin, updaters, creditline-only functions
-- TTL management on all persistent storage entries
+Read [`context/code-standards.md`](./context/code-standards.md) before contributing.
 
-Report vulnerabilities via [SECURITY.md](./SECURITY.md).
+Checklist for every PR:
+- [ ] `cargo build` passes with zero errors
+- [ ] `cargo test` — all 93 existing tests still pass
+- [ ] `require_auth()` is first line of every mutating function
+- [ ] `extend_ttl()` called after every persistent storage write
+- [ ] New tests written for any new function
 
----
-
-## 🤝 Contributing
-
-We welcome Rust and Soroban developers of all levels! See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, code style, and the PR process.
-
-Check the [Roadmap](./ROADMAP.md) for open tasks and good first issues.
+Browse open issues: [StepFi-app/StepFi-Contracts/issues](https://github.com/StepFi-app/StepFi-Contracts/issues)
 
 ---
 
-## 📄 License
+## License
 
-MIT License — see [LICENSE](./LICENSE) for details.
+MIT — see [LICENSE](./LICENSE)
 
----
-
-<div align="center">
-
-**Built with ❤️ for learners everywhere**
-
-[![Stellar](https://img.shields.io/badge/Powered%20by-Stellar-7D00FF?style=flat-square)](https://www.stellar.org/)
-[![Open Source](https://img.shields.io/badge/Open%20Source-Yes-green?style=flat-square)](https://opensource.org/)
-
-</div>
+Part of the [StepFi Protocol](https://github.com/StepFi-app) · Built on [Stellar](https://stellar.org) · Powered by [Soroban](https://soroban.stellar.org)

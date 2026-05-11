@@ -77,8 +77,54 @@ CREDITLINE_ID=$(stellar contract deploy \
   --network $NETWORK 2>&1 | tail -1)
 echo "  CREDIT_LINE_CONTRACT_ID=$CREDITLINE_ID"
 
+# Step 5 — Initialize each contract
 echo ""
-echo "Step 5 — Writing .env.contracts and deployed-testnet.json..."
+echo "Step 5 — Initializing contracts..."
+
+ADMIN_PUBKEY=$(stellar keys address $SOURCE 2>/dev/null)
+# Native XLM Stellar Asset Contract (testnet). Override with TOKEN_ID env var
+# for a custom SEP-41 token.
+TOKEN_ID="${TOKEN_ID:-$(stellar contract id asset --asset native --network $NETWORK 2>/dev/null)}"
+TREASURY="${TREASURY:-$ADMIN_PUBKEY}"
+MERCHANT_FUND="${MERCHANT_FUND:-$ADMIN_PUBKEY}"
+
+echo "  Admin:         $ADMIN_PUBKEY"
+echo "  Token:         $TOKEN_ID"
+echo "  Treasury:      $TREASURY"
+echo "  Merchant fund: $MERCHANT_FUND"
+
+echo "Initializing parameters..."
+stellar contract invoke --id $PARAMETERS_ID --source $SOURCE --network $NETWORK \
+  -- initialize_defaults --admin $SOURCE 2>&1 | tail -1
+
+echo "Initializing reputation..."
+# reputation has no `initialize` — first set_admin call (no prior admin) seeds it.
+stellar contract invoke --id $REPUTATION_ID --source $SOURCE --network $NETWORK \
+  -- set_admin --new_admin $ADMIN_PUBKEY 2>&1 | tail -1
+
+echo "Initializing vendor_registry..."
+stellar contract invoke --id $VENDOR_REGISTRY_ID --source $SOURCE --network $NETWORK \
+  -- initialize --admin $ADMIN_PUBKEY 2>&1 | tail -1
+
+echo "Initializing liquidity_pool..."
+stellar contract invoke --id $LIQUIDITY_POOL_ID --source $SOURCE --network $NETWORK \
+  -- initialize \
+  --token $TOKEN_ID \
+  --treasury $TREASURY \
+  --admin $ADMIN_PUBKEY \
+  --merchant_fund $MERCHANT_FUND 2>&1 | tail -1
+
+echo "Initializing creditline..."
+stellar contract invoke --id $CREDITLINE_ID --source $SOURCE --network $NETWORK \
+  -- initialize \
+  --vendor_registry $VENDOR_REGISTRY_ID \
+  --liquidity_pool $LIQUIDITY_POOL_ID \
+  --reputation_contract $REPUTATION_ID \
+  --token $TOKEN_ID \
+  --admin $ADMIN_PUBKEY 2>&1 | tail -1
+
+echo ""
+echo "Step 6 — Writing .env.contracts and deployed-testnet.json..."
 
 cat > .env.contracts << ENVEOF
 PARAMETERS_CONTRACT_ID=$PARAMETERS_ID
@@ -95,12 +141,41 @@ cat > contracts/deployed-testnet.json << JSONEOF
   "network": "testnet",
   "deployer": "$DEPLOYER_PUBKEY",
   "deployedAt": "$TODAY",
+  "token": {
+    "asset": "native",
+    "sac": "$TOKEN_ID"
+  },
   "contracts": {
-    "parameters": "$PARAMETERS_ID",
-    "reputation": "$REPUTATION_ID",
-    "vendorRegistry": "$VENDOR_REGISTRY_ID",
-    "liquidityPool": "$LIQUIDITY_POOL_ID",
-    "creditline": "$CREDITLINE_ID"
+    "parameters": {
+      "id": "$PARAMETERS_ID",
+      "initialized": true,
+      "initializedAt": "$TODAY",
+      "initMethod": "initialize_defaults(admin)"
+    },
+    "reputation": {
+      "id": "$REPUTATION_ID",
+      "initialized": true,
+      "initializedAt": "$TODAY",
+      "initMethod": "set_admin(new_admin)"
+    },
+    "vendorRegistry": {
+      "id": "$VENDOR_REGISTRY_ID",
+      "initialized": true,
+      "initializedAt": "$TODAY",
+      "initMethod": "initialize(admin)"
+    },
+    "liquidityPool": {
+      "id": "$LIQUIDITY_POOL_ID",
+      "initialized": true,
+      "initializedAt": "$TODAY",
+      "initMethod": "initialize(token, treasury, admin, merchant_fund)"
+    },
+    "creditline": {
+      "id": "$CREDITLINE_ID",
+      "initialized": true,
+      "initializedAt": "$TODAY",
+      "initMethod": "initialize(vendor_registry, liquidity_pool, reputation_contract, token, admin)"
+    }
   }
 }
 JSONEOF
