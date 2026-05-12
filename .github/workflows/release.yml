@@ -20,7 +20,7 @@ jobs:
     with:
       release_name: ${{ github.ref_name }}
       release_description: 'StepFi Protocol — Parameters Contract'
-      relative_path: '["contracts/parameters-contract"]'
+      relative_path: 'contracts/parameters-contract'
       package: 'parameters-contract'
     secrets:
       release_token: ${{ secrets.GITHUB_TOKEN }}
@@ -34,7 +34,7 @@ jobs:
     with:
       release_name: ${{ github.ref_name }}
       release_description: 'StepFi Protocol — Reputation Contract'
-      relative_path: '["contracts/reputation-contract"]'
+      relative_path: 'contracts/reputation-contract'
       package: 'reputation-contract'
     secrets:
       release_token: ${{ secrets.GITHUB_TOKEN }}
@@ -48,7 +48,7 @@ jobs:
     with:
       release_name: ${{ github.ref_name }}
       release_description: 'StepFi Protocol — Vendor Registry Contract'
-      relative_path: '["contracts/vendor-registry-contract"]'
+      relative_path: 'contracts/vendor-registry-contract'
       package: 'vendor-registry-contract'
     secrets:
       release_token: ${{ secrets.GITHUB_TOKEN }}
@@ -62,7 +62,7 @@ jobs:
     with:
       release_name: ${{ github.ref_name }}
       release_description: 'StepFi Protocol — Liquidity Pool Contract'
-      relative_path: '["contracts/liquidity-pool-contract"]'
+      relative_path: 'contracts/liquidity-pool-contract'
       package: 'liquidity-pool-contract'
     secrets:
       release_token: ${{ secrets.GITHUB_TOKEN }}
@@ -79,7 +79,7 @@ jobs:
     with:
       release_name: ${{ github.ref_name }}
       release_description: 'StepFi Protocol — Creditline Contract'
-      relative_path: '["contracts/creditline-contract"]'
+      relative_path: 'contracts/creditline-contract'
       package: 'creditline-contract'
       make_target: 'build-deps'
     secrets:
