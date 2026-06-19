@@ -3,6 +3,7 @@
 mod access;
 mod errors;
 mod events;
+mod safe_math;
 mod storage;
 mod types;
 
@@ -52,9 +53,9 @@ impl ParametersContract {
     pub fn upgrade(env: Env, new_wasm_hash: soroban_sdk::BytesN<32>) {
         let admin = storage::get_admin(&env).unwrap_or_else(|err| panic_with_error!(&env, err));
         admin.require_auth();
+        Self::enter_non_reentrant(&env);
         env.deployer().update_current_contract_wasm(new_wasm_hash);
-        // Self-invoke migrate to run post-upgrade migration logic
-        env.invoke_contract::<()>(&env.current_contract_address(), &Symbol::new(&env, "migrate"), ().into_val(&env));
+        Self::exit_non_reentrant(&env);
     }
     pub fn get_admin(env: Env) -> Result<Address, ParametersError> {
         storage::get_admin(&env)
@@ -65,8 +66,10 @@ impl ParametersContract {
         old_admin.require_auth();
         access::require_admin(&env, &old_admin);
 
+        Self::enter_non_reentrant(&env);
         storage::set_admin(&env, &new_admin);
         events::emit_admin_updated(&env, &old_admin, &new_admin);
+        Self::exit_non_reentrant(&env);
     }
 
     pub fn get_parameters(env: Env) -> Result<ProtocolParameters, ParametersError> {
@@ -78,8 +81,10 @@ impl ParametersContract {
         access::require_admin(&env, &admin);
         Self::validate_parameters(&env, &params);
 
+        Self::enter_non_reentrant(&env);
         storage::set_parameters(&env, &params);
         events::emit_parameters_updated(&env, &admin, &params);
+        Self::exit_non_reentrant(&env);
     }
 
     fn validate_parameters(env: &Env, params: &ProtocolParameters) {
@@ -89,6 +94,17 @@ impl ParametersContract {
         {
             panic_with_error!(env, ParametersError::InvalidParameters);
         }
+    }
+
+    fn enter_non_reentrant(env: &Env) {
+        if storage::is_reentrancy_locked(env).unwrap_or_else(|err| panic_with_error!(env, err)) {
+            panic_with_error!(env, ParametersError::ReentrancyDetected);
+        }
+        storage::set_reentrancy_locked(env, true);
+    }
+
+    fn exit_non_reentrant(env: &Env) {
+        storage::set_reentrancy_locked(env, false);
     }
 }
 

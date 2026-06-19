@@ -20,6 +20,7 @@ pub fn set_schema_version(env: &Env, version: u32) {
 pub const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
 pub const UPDATERS_MAP: Symbol = symbol_short!("UPDATERS");
 pub const SCORES_MAP: Symbol = symbol_short!("SCORES");
+pub const REENTRANCY_LOCK: Symbol = symbol_short!("LOCKED");
 
 /// Get the admin address from storage
 pub fn get_admin(env: &Env) -> Result<Address, ReputationError> {
@@ -83,4 +84,16 @@ pub fn set_updater(env: &Env, updater: &Address, allowed: bool) {
     }
 
     env.storage().instance().set(&UPDATERS_MAP, &updaters);
+}
+
+pub fn is_reentrancy_locked(env: &Env) -> Result<bool, ReputationError> {
+    Ok(env
+        .storage()
+        .instance()
+        .get(&REENTRANCY_LOCK)
+        .unwrap_or(false))
+}
+
+pub fn set_reentrancy_locked(env: &Env, locked: bool) {
+    env.storage().instance().set(&REENTRANCY_LOCK, &locked);
 }

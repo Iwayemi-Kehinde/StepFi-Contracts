@@ -11,5 +11,6 @@ pub enum Error {
     InvalidName = 5,
     Unauthorized = 6,
     Overflow = 7,
-    MigrationRequired = 8,
+    ReentrancyDetected = 8,
+    Underflow = 9,
 }

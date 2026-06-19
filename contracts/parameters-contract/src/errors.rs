@@ -8,5 +8,7 @@ pub enum ParametersError {
     NotAdmin = 2,
     InvalidParameters = 3,
     NotInitialized = 4,
-    MigrationRequired = 5,
+    ReentrancyDetected = 5,
+    Overflow = 6,
+    Underflow = 7,
 }

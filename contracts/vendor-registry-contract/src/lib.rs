@@ -3,6 +3,7 @@
 mod access;
 mod errors;
 mod events;
+mod safe_math;
 mod storage;
 mod types;
 
@@ -32,6 +33,18 @@ impl VendorRegistryContract {
         Ok(())
     }
 
+    fn check_non_reentrant(env: &Env) -> Result<(), Error> {
+        if storage::is_reentrancy_locked(env)? {
+            return Err(Error::ReentrancyDetected);
+        }
+        storage::set_reentrancy_locked(env, true);
+        Ok(())
+    }
+
+    fn exit_non_reentrant(env: &Env) {
+        storage::set_reentrancy_locked(env, false);
+    }
+
     /// Registers a new vendor
     pub fn register_vendor(
         env: Env,
@@ -53,6 +66,8 @@ impl VendorRegistryContract {
             return Err(Error::InvalidName);
         }
 
+        Self::check_non_reentrant(&env)?;
+
         let info = VendorInfo {
             name: name.clone(),
             registration_date: env.ledger().timestamp(),
@@ -64,6 +79,8 @@ impl VendorRegistryContract {
         storage::increment_vendor_count(&env)?;
         events::publish_vendor_registered(&env, vendor, name);
 
+        Self::exit_non_reentrant(&env);
+
         Ok(())
     }
 
@@ -74,10 +91,15 @@ impl VendorRegistryContract {
         }
 
         access::require_admin(&env, &admin)?;
+
+        Self::check_non_reentrant(&env)?;
+
         let mut info = storage::get_vendor(&env, &vendor)?;
         info.active = false;
         storage::set_vendor(&env, &vendor, &info);
         events::publish_vendor_status(&env, vendor, false);
+
+        Self::exit_non_reentrant(&env);
 
         Ok(())
     }
@@ -89,10 +111,15 @@ impl VendorRegistryContract {
         }
 
         access::require_admin(&env, &admin)?;
+
+        Self::check_non_reentrant(&env)?;
+
         let mut info = storage::get_vendor(&env, &vendor)?;
         info.active = true;
         storage::set_vendor(&env, &vendor, &info);
         events::publish_vendor_status(&env, vendor, true);
+
+        Self::exit_non_reentrant(&env);
 
         Ok(())
     }
@@ -110,10 +137,15 @@ impl VendorRegistryContract {
         }
 
         access::require_admin(&env, &admin)?;
+
+        Self::check_non_reentrant(&env)?;
+
         let mut info = storage::get_vendor(&env, &vendor)?;
         info.active = active;
         storage::set_vendor(&env, &vendor, &info);
         events::publish_vendor_status(&env, vendor, active);
+
+        Self::exit_non_reentrant(&env);
 
         Ok(())
     }
