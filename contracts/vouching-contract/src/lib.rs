@@ -108,6 +108,41 @@ impl VouchingContract {
         storage::is_mentor(&env, &mentor)
     }
 
+    /// Set the admin address for this contract.
+    /// Requires authorization from the current admin.
+    pub fn set_admin(env: Env, new_admin: Address) {
+        let old_admin = storage::get_admin(&env).unwrap_or_else(|err| panic_with_error!(&env, err));
+        old_admin.require_auth();
+        Self::require_admin(&env, &old_admin);
+
+        storage::set_admin(&env, &new_admin);
+    }
+
+    /// Migrate contract storage to the latest schema version.
+    /// Called automatically during upgrade() to handle any data migrations.
+    /// This is idempotent and safe to call multiple times.
+    pub fn migrate(env: Env) {
+        let stored = storage::get_schema_version(&env);
+        let current = storage::CURRENT_SCHEMA_VERSION;
+        if stored >= current {
+            return;
+        }
+        // Future: add per-version data migration steps here
+        storage::set_schema_version(&env, current);
+    }
+
+    /// Upgrade the contract WASM — admin only.
+    /// After replacing the WASM, automatically runs migrate() to ensure
+    /// contract storage is up to date with the new code version.
+    pub fn upgrade(env: Env, new_wasm_hash: soroban_sdk::BytesN<32>) {
+        let admin = storage::get_admin(&env).unwrap_or_else(|err| panic_with_error!(&env, err));
+        admin.require_auth();
+        Self::require_admin(&env, &admin);
+        env.deployer().update_current_contract_wasm(new_wasm_hash);
+        // Self-invoke migrate to run post-upgrade migration logic
+        env.invoke_contract::<()>(&env.current_contract_address(), &Symbol::new(&env, "migrate"), ().into_val(&env));
+    }
+
     fn add_reputation_boost(env: &Env, learner: &Address, boost_amount: u32) {
         let reputation_contract =
             storage::get_reputation_contract(env).unwrap_or_else(|err| panic_with_error!(env, err));

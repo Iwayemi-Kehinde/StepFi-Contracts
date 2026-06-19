@@ -4,6 +4,19 @@ use crate::{
 };
 use soroban_sdk::{Address, Env};
 
+// Schema version
+pub const CURRENT_SCHEMA_VERSION: u32 = 1;
+
+/// Get the current schema version (0 = unset)
+pub fn get_schema_version(env: &Env) -> u32 {
+    env.storage().instance().get(&DataKey::SchemaVersion).unwrap_or(0)
+}
+
+/// Set the schema version
+pub fn set_schema_version(env: &Env, version: u32) {
+    env.storage().instance().set(&DataKey::SchemaVersion, &version);
+}
+
 pub const PERSISTENT_TTL_THRESHOLD: u32 = 1_036_800;
 pub const PERSISTENT_TTL_EXTEND_TO: u32 = 2_073_600;
 

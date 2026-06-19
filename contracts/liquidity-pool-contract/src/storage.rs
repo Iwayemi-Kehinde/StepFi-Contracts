@@ -2,6 +2,20 @@ use soroban_sdk::{symbol_short, Address, Env, Symbol};
 
 use crate::errors::LiquidityPoolError;
 
+// Schema version key
+pub const SCHEMA_VERSION_KEY: Symbol = symbol_short!("SCHEMA_V");
+pub const CURRENT_SCHEMA_VERSION: u32 = 1;
+
+/// Get the current schema version (0 = unset)
+pub fn get_schema_version(env: &Env) -> u32 {
+    env.storage().instance().get(&SCHEMA_VERSION_KEY).unwrap_or(0)
+}
+
+/// Set the schema version
+pub fn set_schema_version(env: &Env, version: u32) {
+    env.storage().instance().set(&SCHEMA_VERSION_KEY, &version);
+}
+
 // Instance storage keys
 pub const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
 pub const TOKEN_KEY: Symbol = symbol_short!("TOKEN");

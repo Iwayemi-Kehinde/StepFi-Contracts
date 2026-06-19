@@ -9,7 +9,7 @@ mod types;
 pub use errors::ParametersError;
 pub use types::{default_parameters, ProtocolParameters};
 
-use soroban_sdk::{contract, contractimpl, panic_with_error, Address, Env};
+use soroban_sdk::{contract, contractimpl, panic_with_error, Address, Env, IntoVal, Symbol};
 
 #[contract]
 pub struct ParametersContract;
@@ -33,11 +33,28 @@ impl ParametersContract {
         Self::initialize(env, admin, default_parameters());
     }
 
-    /// Upgrade the contract WASM — admin only
+    /// Migrate contract storage to the latest schema version.
+    /// Called automatically during upgrade() to handle any data migrations.
+    /// This is idempotent and safe to call multiple times.
+    pub fn migrate(env: Env) {
+        let stored = storage::get_schema_version(&env);
+        let current = storage::CURRENT_SCHEMA_VERSION;
+        if stored >= current {
+            return;
+        }
+        // Future: add per-version data migration steps here
+        storage::set_schema_version(&env, current);
+    }
+
+    /// Upgrade the contract WASM — admin only.
+    /// After replacing the WASM, automatically runs migrate() to ensure
+    /// contract storage is up to date with the new code version.
     pub fn upgrade(env: Env, new_wasm_hash: soroban_sdk::BytesN<32>) {
         let admin = storage::get_admin(&env).unwrap_or_else(|err| panic_with_error!(&env, err));
         admin.require_auth();
         env.deployer().update_current_contract_wasm(new_wasm_hash);
+        // Self-invoke migrate to run post-upgrade migration logic
+        env.invoke_contract::<()>(&env.current_contract_address(), &Symbol::new(&env, "migrate"), ().into_val(&env));
     }
     pub fn get_admin(env: Env) -> Result<Address, ParametersError> {
         storage::get_admin(&env)

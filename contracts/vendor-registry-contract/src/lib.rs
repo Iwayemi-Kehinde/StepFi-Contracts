@@ -10,7 +10,7 @@ mod types;
 mod tests;
 
 use errors::Error;
-use soroban_sdk::{contract, contractimpl, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, Address, Env, IntoVal, String, Symbol, Val};
 use types::VendorInfo;
 
 // Export Error type for external use
@@ -138,5 +138,43 @@ impl VendorRegistryContract {
         }
 
         storage::get_vendor_count(&env)
+    }
+
+    /// Set the admin address for this contract.
+    /// Requires authorization from the current admin.
+    pub fn set_admin(env: Env, new_admin: Address) -> Result<(), Error> {
+        let old_admin = storage::get_admin(&env)?;
+        old_admin.require_auth();
+        access::require_admin(&env, &old_admin)?;
+
+        storage::set_admin(&env, &new_admin);
+        Ok(())
+    }
+
+    /// Migrate contract storage to the latest schema version.
+    /// Called automatically during upgrade() to handle any data migrations.
+    /// This is idempotent and safe to call multiple times.
+    pub fn migrate(env: Env) -> Result<(), Error> {
+        let stored = storage::get_schema_version(&env);
+        let current = storage::CURRENT_SCHEMA_VERSION;
+        if stored >= current {
+            return Ok(());
+        }
+        // Future: add per-version data migration steps here
+        storage::set_schema_version(&env, current);
+        Ok(())
+    }
+
+    /// Upgrade the contract WASM — admin only.
+    /// After replacing the WASM, automatically runs migrate() to ensure
+    /// contract storage is up to date with the new code version.
+    pub fn upgrade(env: Env, new_wasm_hash: soroban_sdk::BytesN<32>) -> Result<(), Error> {
+        let admin = storage::get_admin(&env)?;
+        admin.require_auth();
+        access::require_admin(&env, &admin)?;
+        env.deployer().update_current_contract_wasm(new_wasm_hash);
+        // Self-invoke migrate to run post-upgrade migration logic
+        env.invoke_contract::<Val>(&env.current_contract_address(), &Symbol::new(&env, "migrate"), ().into_val(&env));
+        Ok(())
     }
 }

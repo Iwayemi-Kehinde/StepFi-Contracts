@@ -16,6 +16,7 @@ pub struct VouchRecord {
 #[derive(Clone)]
 pub enum DataKey {
     Admin,
+    SchemaVersion,
     ReputationContract,
     VouchBoost,
     Mentor(Address),
