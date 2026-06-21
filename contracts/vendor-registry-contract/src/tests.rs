@@ -1,7 +1,7 @@
 use super::*;
 use soroban_sdk::{
-    testutils::{Address as _, Ledger},
-    Address, Env, String,
+    testutils::{Address as _, Events, Ledger},
+    Address, Env, IntoVal, String, Val, Vec,
 };
 
 /// Helper function to set up the environment, contract, and test addresses.
@@ -268,4 +268,40 @@ fn test_reentrancy_guard_is_released_after_call() {
     // Lock should be released, second call should also succeed
     client.deactivate_vendor(&admin, &vendor);
     client.activate_vendor(&admin, &vendor);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract")] // non-admin upgrade rejected
+fn test_upgrade_rejected_for_non_admin() {
+    let env = Env::default();
+    let contract_id = env.register(VendorRegistryContract, ());
+    let client = VendorRegistryContractClient::new(&env, &contract_id);
+
+    let wasm_hash = soroban_sdk::BytesN::from_array(&env, &[0u8; 32]);
+    client.upgrade(&wasm_hash);
+}
+
+#[test]
+fn test_admin_upgrade_increments_version_and_emits_event() {
+    let env = Env::default();
+    let (client, admin, _vendor) = setup(&env);
+    env.mock_all_auths();
+
+    assert_eq!(client.get_version(), 1u32);
+    let wasm_hash = env.deployer().upload_contract_wasm(soroban_sdk::Bytes::from_slice(
+        &env,
+        include_bytes!("../../../contracts/test-fixtures/contract.wasm"),
+    ));
+    client.upgrade(&wasm_hash);
+
+    let events: soroban_sdk::Vec<(soroban_sdk::Address, soroban_sdk::Vec<soroban_sdk::Val>, soroban_sdk::Val)> = env.events().all();
+    let mut found = false;
+    for e in events.iter() {
+        let topic: soroban_sdk::Symbol = e.1.get_unchecked(0).into_val(&env);
+        if topic == soroban_sdk::Symbol::new(&env, "CONTRACTUPGRADED") {
+            found = true;
+            break;
+        }
+    }
+    assert!(found, "CONTRACTUPGRADED event not found");
 }

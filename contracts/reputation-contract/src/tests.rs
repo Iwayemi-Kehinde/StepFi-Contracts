@@ -277,7 +277,47 @@ fn it_gets_version() {
     let client = ReputationContractClient::new(&env, &contract_id);
 
     let version = client.get_version();
-    assert_eq!(version, symbol_short!("v1_0_0"));
+    assert_eq!(version, 1u32);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract")] // non-admin rejected
+fn it_rejects_upgrade_from_non_admin() {
+    let env = Env::default();
+    let contract_id = env.register(ReputationContract, ());
+    let client = ReputationContractClient::new(&env, &contract_id);
+
+    let wasm_hash = soroban_sdk::BytesN::from_array(&env, &[0u8; 32]);
+    client.upgrade(&wasm_hash);
+}
+
+#[test]
+fn it_allows_admin_upgrade_and_bumps_version() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(ReputationContract, ());
+    let client = ReputationContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    client.set_admin(&admin);
+
+    assert_eq!(client.get_version(), 1u32);
+    let wasm_hash = env.deployer().upload_contract_wasm(soroban_sdk::Bytes::from_slice(
+        &env,
+        include_bytes!("../../../contracts/test-fixtures/contract.wasm"),
+    ));
+    client.upgrade(&wasm_hash);
+
+    let events: soroban_sdk::Vec<(soroban_sdk::Address, soroban_sdk::Vec<soroban_sdk::Val>, soroban_sdk::Val)> = env.events().all();
+    let mut found = false;
+    for e in events.iter() {
+        let topic: soroban_sdk::Symbol = e.1.get_unchecked(0).into_val(&env);
+        if topic == soroban_sdk::Symbol::new(&env, "CONTRACTUPGRADED") {
+            found = true;
+            break;
+        }
+    }
+    assert!(found, "CONTRACTUPGRADED event not found");
 }
 
 /// Test: Revokes updater access after removal
