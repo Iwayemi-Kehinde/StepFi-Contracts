@@ -1351,3 +1351,29 @@ fn it_allows_setting_score_to_current_value() {
     client.set_score(&updater, &user, &75);
     assert_eq!(client.get_score(&user), 75);
 }
+
+#[test]
+fn test_schema_version_and_migration() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(ReputationContract, ());
+    let client = ReputationContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.set_admin(&admin);
+
+    // Default version should be 0
+    assert_eq!(client.get_schema_version(), 0);
+
+    // Call migrate() directly
+    client.migrate();
+
+    // After migration, version should be 2
+    assert_eq!(client.get_schema_version(), 2);
+
+    // Call migrate() again (idempotent check)
+    client.migrate();
+    assert_eq!(client.get_schema_version(), 2);
+}
+

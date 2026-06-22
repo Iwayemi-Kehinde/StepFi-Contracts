@@ -3125,3 +3125,40 @@ fn test_safe_math_boundaries() {
     assert_eq!(safe_math::mul_i128(max, 2), Err(CreditLineError::Overflow));
     assert_eq!(safe_math::div_i128(max, 0), Err(CreditLineError::Overflow));
 }
+
+#[test]
+fn test_schema_version_and_migration() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(CreditLineContract, ());
+    let client = CreditLineContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let reputation_contract = Address::generate(&env);
+    let vendor_registry = Address::generate(&env);
+    let liquidity_pool = Address::generate(&env);
+    let token = Address::generate(&env);
+
+    client.initialize(
+        &admin,
+        &reputation_contract,
+        &vendor_registry,
+        &liquidity_pool,
+        &token,
+    );
+
+    // Default version should be 0
+    assert_eq!(client.get_schema_version(), 0);
+
+    // Call migrate() directly
+    client.migrate();
+
+    // After migration, version should be 2
+    assert_eq!(client.get_schema_version(), 2);
+
+    // Call migrate() again (idempotent check)
+    client.migrate();
+    assert_eq!(client.get_schema_version(), 2);
+}
+

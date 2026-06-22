@@ -2417,3 +2417,33 @@ fn test_loan_funding_and_guarantee_recovery_cycle() {
     assert_eq!(stats_final.locked_liquidity, 2_500);
     assert_eq!(stats_final.available_liquidity, 3_000);
 }
+
+#[test]
+fn test_schema_version_and_migration() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(LiquidityPoolContract, ());
+    let client = LiquidityPoolContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let token = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let merchant_fund = Address::generate(&env);
+
+    client.initialize(&admin, &token, &treasury, &merchant_fund);
+
+    // Default version should be 0
+    assert_eq!(client.get_schema_version(), 0);
+
+    // Call migrate() directly
+    client.migrate();
+
+    // After migration, version should be 2
+    assert_eq!(client.get_schema_version(), 2);
+
+    // Call migrate() again (idempotent check)
+    client.migrate();
+    assert_eq!(client.get_schema_version(), 2);
+}
+

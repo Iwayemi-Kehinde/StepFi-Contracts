@@ -269,3 +269,22 @@ pub fn get_version(env: &Env) -> Result<u32, CreditLineError> {
 pub fn set_version(env: &Env, version: u32) {
     env.storage().instance().set(&VERSION_KEY, &version);
 }
+
+pub const SCHEMA_VERSION_KEY: Symbol = symbol_short!("SCH_VER");
+
+/// Get the contract schema version (persistent storage). Defaults to 0 when not set.
+pub fn get_schema_version(env: &Env) -> u32 {
+    env.storage()
+        .persistent()
+        .get(&SCHEMA_VERSION_KEY)
+        .unwrap_or(0u32)
+}
+
+/// Set the contract schema version in persistent storage.
+pub fn set_schema_version(env: &Env, version: u32) {
+    env.storage().persistent().set(&SCHEMA_VERSION_KEY, &version);
+    env.storage()
+        .persistent()
+        .extend_ttl(&SCHEMA_VERSION_KEY, PERSISTENT_TTL_THRESHOLD, PERSISTENT_TTL_EXTEND_TO);
+}
+

@@ -123,3 +123,23 @@ fn test_admin_upgrade_increments_version() {
     }
     assert!(found, "CONTRACTUPGRADED event not found");
 }
+
+#[test]
+fn test_schema_version_and_migration() {
+    let (env, client, admin) = setup();
+    client.initialize_defaults(&admin);
+
+    // Default version should be 0
+    assert_eq!(client.get_schema_version(), 0);
+
+    // Call migrate() directly
+    client.migrate();
+
+    // After migration, version should be 2
+    assert_eq!(client.get_schema_version(), 2);
+
+    // Call migrate() again (idempotent check)
+    client.migrate();
+    assert_eq!(client.get_schema_version(), 2);
+}
+

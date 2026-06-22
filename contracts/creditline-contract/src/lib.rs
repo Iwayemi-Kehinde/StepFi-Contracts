@@ -198,6 +198,42 @@ impl CreditLineContract {
 
         env.deployer().update_current_contract_wasm(new_wasm_hash);
         events::emit_contract_upgraded(&env, old_version, new_version);
+
+        // Automatically execute migrate() during upgrade() by calling self.
+        // This spins up a new VM running the upgraded WASM hash.
+        env.invoke_contract::<()>(
+            &env.current_contract_address(),
+            &Symbol::new(&env, "migrate"),
+            (),
+        );
+    }
+
+    pub fn get_schema_version(env: Env) -> u32 {
+        storage::get_schema_version(&env)
+    }
+
+    pub fn migrate(env: Env) {
+        let admin = storage::get_admin(&env).unwrap_or_else(|err| panic_with_error!(&env, err));
+        admin.require_auth();
+
+        let mut current_version = storage::get_schema_version(&env);
+        let target_version = 2;
+
+        if current_version >= target_version {
+            return;
+        }
+
+        if current_version == 0 {
+            // Version 0 -> 1 migration logic (idempotent & safe)
+            current_version = 1;
+            storage::set_schema_version(&env, current_version);
+        }
+
+        if current_version == 1 {
+            // Version 1 -> 2 migration logic (idempotent & safe)
+            current_version = 2;
+            storage::set_schema_version(&env, current_version);
+        }
     }
     pub fn get_admin(env: Env) -> Result<Address, CreditLineError> {
         storage::get_admin(&env)
